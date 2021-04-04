@@ -83,7 +83,7 @@ class SpellPoints {
       }
       console.log(item)
       item.effects.forEach((effect)=>{
-        if(effect.label=="Spell Focus"){
+        if(effect.data.label=="Spell Focus"){
           _focuses.set(item._id,item)
         }
       })
@@ -91,7 +91,7 @@ class SpellPoints {
     return _focuses
   }
 
-  static getTotalSpellpoints(focuses) {
+  static getTotalSpellPoints(focuses) {
     let _totalPoints = 0
     focuses.forEach((focus)=>{
       _totalPoints += focus.data.data.uses.value
@@ -105,7 +105,7 @@ class SpellPoints {
       if(remainingPoints<=0){
         return
       }
-      focusPoints = focus.data.data.uses.value
+      let focusPoints = focus.data.data.uses.value
       if(focusPoints<=remainingPoints){
         remainingPoints -= focusPoints
         focus.update({data:{uses:{value:0}}})
@@ -225,20 +225,9 @@ class SpellPoints {
     
     if (!isSpell)
       return;
-
-    /** get spellpoints **/
-    /*
-    let spellPointResource = SpellPoints.getSpellPointsResource(actor);
-    if (!spellPointResource) {
-      // this actor has no spell point resource what to do?
-      const messageCreate = game.i18n.format("dnd5e-spellpoints.pleaseCreate", {SpellPoints: this.settings.spResource });
-      $('#ability-use-form', html).append('<div class="spError">'+messageCreate+'</div>');
-      return;
-    }
-    const maxSpellPoints = actor.data.data.resources[spellPointResource.key].max;
-    const actualSpellPoints = actor.data.data.resources[spellPointResource.key].value;
-    */
-    const actualSpellPoints = SpellPoints.getTotalSpellPoints(SpellPoints.getSpellPointsItems(actor))
+    const focuses = SpellPoints.getSpellPointsItems(actor)
+    const actualSpellPoints = SpellPoints.getTotalSpellPoints(focuses)
+    console.log(MODULE_NAME,"focuses",focuses,"total Points",actualSpellPoints)
 
     let spellPointCost = this.settings.spellPointsCosts[baseSpellLvl];
     
