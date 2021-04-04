@@ -8,7 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 
-const MODULE_NAME = 'dnd5e-spellpoints';
+const MODULE_NAME = 'ningov-spellpoints';
 
 Handlebars.registerHelper("spFormat", (path, ...args) => {
   return game.i18n.format(path, args[0].hash);
@@ -67,7 +67,55 @@ class SpellPoints {
     }
     return false;
   }
-  
+
+  static getSpellPointsItems(actor) {
+    let _items = getProperty(actor, "items")
+    let _focuses = new Map()
+    _items.forEach((item)=>{
+      if(!(item.data.type=="consumable")){
+        return
+      }
+      if(!(item.data.data.attunement==2)){
+        return
+      }
+      if(item.data.data.uses.max<=0){
+        return
+      }
+      console.log(item)
+      item.effects.forEach((effect)=>{
+        if(effect.label=="Spell Focus"){
+          _focuses.set(item._id,item)
+        }
+      })
+    })
+    return _focuses
+  }
+
+  static getTotalSpellpoints(focuses) {
+    let _totalPoints = 0
+    focuses.forEach((focus)=>{
+      _totalPoints += focus.data.data.uses.value
+    })
+    return _totalPoints
+  }
+
+  static reduceSpellPoints(points,focuses) {
+    let remainingPoints = points
+    focuses.forEach((focus)=>{
+      if(remainingPoints<=0){
+        return
+      }
+      focusPoints = focus.data.data.uses.value
+      if(focusPoints<=remainingPoints){
+        remainingPoints -= focusPoints
+        focus.update({data:{uses:{value:0}}})
+      }else{
+        focus.update({data:{uses:{value:focusPoints-remainingPoints}}})
+        remainingPoints = 0
+      }
+    })
+  }
+
   static castSpell(actor, update) {
     console.log('Cast Spell',actor, update);
     /** do nothing if module is not active **/ 
@@ -87,19 +135,17 @@ class SpellPoints {
       return update;
     
     let hp = getProperty(update, "data.attributes.hp.value");
-    let spellPointResource = SpellPoints.getSpellPointsResource(actor);
+    //let spellPointResource = SpellPoints.getSpellPointsResource(actor);
+    let focuses = SpellPoints.getSpellPointsItems(actor);
 
-    /** not found any resource for spellpoints ? **/
-    if (!spellPointResource) {
+    if (focuses.size<=0){
       ChatMessage.create({
         content: "<i style='color:red;'>" + game.i18n.format("dnd5e-spellpoints.actorNoSP", {ActorName: actor.data.name, SpellPoints: this.settings.spResource }) + "</i>",
         speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
       });
-      game.i18n.format("dnd5e-spellpoints.createNewResource", this.settings.spResource);
-      ui.notifications.error(game.i18n.format("dnd5e-spellpoints.createNewResource", { SpellPoints : this.settings.spResource }));
       return {};
     }
-    
+
     /** check if is pact magic **/
     let isPact = false;
     if (getProperty(update, "data.spells.pact") !== undefined) {
@@ -130,59 +176,22 @@ class SpellPoints {
     }
     update.data.spells[spellLvlNames[spellLvlIndex]].value = maxSlots;
         
-    const maxSpellPoints = actor.data.data.resources[spellPointResource.key].max;
-    const actualSpellPoints = actor.data.data.resources[spellPointResource.key].value;
+    //const maxSpellPoints = actor.data.data.resources[spellPointResource.key].max;
+    //const actualSpellPoints = actor.data.data.resources[spellPointResource.key].value;
+    const actualSpellPoints = SpellPoints.getTotalSpellPoints(focuses)
    
-   /* get spell cost in spellpoints */
+    /* get spell cost in spellpoints */
     const spellPointCost = this.settings.spellPointsCosts[spellLvl];
     
-    /** update spellpoints **/
     if (actualSpellPoints - spellPointCost >= 0 ) {
-      /* character has enough spellpoints */
-      spellPointResource.values.value = spellPointResource.values.value - spellPointCost;
-    } else if (actualSpellPoints - spellPointCost < 0) {
-      /** check if actor can cast using HP **/
-      if (this.settings.spEnableVariant) {
-        // spell point resource is 0 but character can still cast.
-        spellPointResource.values.value = 0;
-        const hpMaxLost = spellPointCost * SpellPoints.settings.spLifeCost;
-        const hpActual = actor.data.data.attributes.hp.value;
-        let hpMaxActual = actor.data.data.attributes.hp.tempmax;
-        const hpMaxFull = actor.data.data.attributes.hp.max;
-        if (!hpMaxActual)
-          hpMaxActual = 0;
-        const newMaxHP = hpMaxActual - hpMaxLost;
+      SpellPoints.reduceSpellPoints(spellPointCost,focuses)
+    } else { 
+      ChatMessage.create({
         
-        if (hpMaxFull + newMaxHP <= 0) { //character is permanently dead
-          // 3 death saves failed and 0 hp 
-          update.data.attributes = {'death':{'failure':3}, 'hp':{'tempmax':-hpMaxFull,'value':0}}; 
-          ChatMessage.create({
-            content: "<i style='color:red;'>"+game.i18n.format("dnd5e-spellpoints.castedLifeDead", { ActorName : actor.data.name })+"</i>",
-            
-            speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
-          });
-        } else {
-          update.data.attributes = {'hp':{'tempmax':newMaxHP}};// hp max reduction
-          if (hpActual > newMaxHP) { // a character cannot have more hp than his maximum
-            update.data.attributes = mergeObject(update.data.attributes,{'hp':{'value': hpMaxFull + newMaxHP}});
-          }
-          ChatMessage.create({
-            content: "<i style='color:red;'>"+game.i18n.format("dnd5e-spellpoints.castedLife", { ActorName : actor.data.name, hpMaxLost: hpMaxLost })+"</i>",
-            speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
-          });
-        }
-      } else { 
-        ChatMessage.create({
-          
-          content: "<i style='color:red;'>"+game.i18n.format("dnd5e-spellpoints.notEnoughSp", { ActorName : actor.data.name, SpellPoints: this.settings.spResource })+"</i>",
-          speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
-        });
-      }
+        content: "<i style='color:red;'>"+game.i18n.format("dnd5e-spellpoints.notEnoughSp", { ActorName : actor.data.name, SpellPoints: this.settings.spResource })+"</i>",
+        speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
+      });
     }
-    
-    update.data.resources = {
-      [spellPointResource.key] : spellPointResource.values
-    };
     
     return update;
   }
@@ -218,6 +227,7 @@ class SpellPoints {
       return;
 
     /** get spellpoints **/
+    /*
     let spellPointResource = SpellPoints.getSpellPointsResource(actor);
     if (!spellPointResource) {
       // this actor has no spell point resource what to do?
@@ -227,6 +237,8 @@ class SpellPoints {
     }
     const maxSpellPoints = actor.data.data.resources[spellPointResource.key].max;
     const actualSpellPoints = actor.data.data.resources[spellPointResource.key].value;
+    */
+    const actualSpellPoints = SpellPoints.getTotalSpellPoints(SpellPoints.getSpellPointsItems(actor))
 
     let spellPointCost = this.settings.spellPointsCosts[baseSpellLvl];
     
@@ -463,11 +475,11 @@ Hooks.on("renderAbilityUseDialog", async (dialog, html, formData) => {
 // const item = actor.items.find(i => i.name === "Items Name");
 Hooks.on("updateOwnedItem", async (actor, item, update, diff, userId) => {
   console.log(MODULE_NAME, 'updateOwnedItem');
-  SpellPoints.calculateSpellPoints(actor, item, 'update');
+  //SpellPoints.calculateSpellPoints(actor, item, 'update');
 })
 Hooks.on("createOwnedItem", async (actor, item, options, userId) => {
   console.log(MODULE_NAME, 'createOwnedItem');
-  SpellPoints.calculateSpellPoints(actor, item, 'create');
+  //SpellPoints.calculateSpellPoints(actor, item, 'create');
 })
 Hooks.on("renderActorSheet5e", (app, html, data) => {
   console.log(MODULE_NAME, 'renderActorSheet5e');
