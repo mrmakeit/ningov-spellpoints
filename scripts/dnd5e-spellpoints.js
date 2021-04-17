@@ -24,7 +24,7 @@ class SpellPoints {
    */
   static get defaultSettings() {
     return {
-      spEnableSpellpoints: false,
+      spEnableSpellpoints: true,
       spResource: 'Spell Points',
       spAutoSpellpoints: false,
       spFormula: 'DMG',
@@ -78,21 +78,23 @@ class SpellPoints {
       if(!(item.data.data.attunement==2)){
         return
       }
+      console.log(item)
       if(item.data.data.uses.max<=0){
         return
       }
-      console.log(item)
       item.effects.forEach((effect)=>{
-        if(effect.data.label=="Spell Focus"){
+        if(effect.data.label==this.settings.spResource){
           _focuses.set(item._id,item)
         }
       })
     })
+    console.log(_focuses)
     return _focuses
   }
 
   static getTotalSpellPoints(focuses) {
     let _totalPoints = 0
+    console.log(focuses)
     focuses.forEach((focus)=>{
       _totalPoints += focus.data.data.uses.value
     })
@@ -140,7 +142,7 @@ class SpellPoints {
 
     if (focuses.size<=0){
       ChatMessage.create({
-        content: "<i style='color:red;'>" + game.i18n.format("dnd5e-spellpoints.actorNoSP", {ActorName: actor.data.name, SpellPoints: this.settings.spResource }) + "</i>",
+        content: "<i style='color:red;'>" + game.i18n.format("ningov-spellpoints.actorNoSP", {ActorName: actor.data.name, SpellPoints: this.settings.spResource }) + "</i>",
         speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
       });
       return {};
@@ -188,7 +190,7 @@ class SpellPoints {
     } else { 
       ChatMessage.create({
         
-        content: "<i style='color:red;'>"+game.i18n.format("dnd5e-spellpoints.notEnoughSp", { ActorName : actor.data.name, SpellPoints: this.settings.spResource })+"</i>",
+        content: "<i style='color:red;'>"+game.i18n.format("ningov-spellpoints.notEnoughSp", { ActorName : actor.data.name, SpellPoints: this.settings.spResource })+"</i>",
         speaker: ChatMessage.getSpeaker({ alias: actor.data.name })
       });
     }
@@ -232,7 +234,7 @@ class SpellPoints {
     let spellPointCost = this.settings.spellPointsCosts[baseSpellLvl];
     
     if (actualSpellPoints - spellPointCost < 0) {
-      const messageNotEnough = game.i18n.format("dnd5e-spellpoints.youNotEnough", {SpellPoints: this.settings.spResource });
+      const messageNotEnough = game.i18n.format("ningov-spellpoints.youNotEnough", {SpellPoints: this.settings.spResource });
       $('#ability-use-form', html).append('<div class="spError">'+messageNotEnough+'</div>');
     }
 
@@ -362,7 +364,7 @@ class SpellPoints {
       checked = "checked";
     }
     let html_checkbox = '<div class="spEnable flexrow "><label><i class="fas fa-magic"></i>&nbsp;';
-    html_checkbox += game.i18n.localize('dnd5e-spellpoints.use-spellpoints');
+    html_checkbox += game.i18n.localize('ningov-spellpoints.use-spellpoints');
     
     html_checkbox += '<input name="flags.dnd5espellpoints.enabled" '+checked+' class="spEnableInput visually-hidden" type="checkbox" value="1">';
     html_checkbox += ' <i class="spEnableCheck fas"></i>';
@@ -379,7 +381,7 @@ class SpellPoints {
 class SpellPointsForm extends FormApplication {
   static get defaultOptions() {
     return mergeObject(super.defaultOptions, {
-      title: game.i18n.localize('dnd5e-spellpoints.form-title'),
+      title: game.i18n.localize('ningov-spellpoints.form-title'),
       id: 'spellpoints-form',
       template: `modules/${MODULE_NAME}/templates/spellpoint-config.html`,
       width: 500,
@@ -390,7 +392,7 @@ class SpellPointsForm extends FormApplication {
   getData(options) {
     return mergeObject({
       spFormulas: {
-          'DMG': game.i18n.localize('dnd5e-spellpoints.DMG')
+          'DMG': game.i18n.localize('ningov-spellpoints.DMG')
           //'AM': game.i18n.localize('dnd5e-spellpoints.AM')
       }
     }, this.reset ? SpellPoints.defaultSettings :
@@ -417,22 +419,10 @@ class SpellPointsForm extends FormApplication {
 Hooks.on('init', () => {
   console.log('SpellPoints init');
   /** should spellpoints be enabled */
-  game.settings.register(MODULE_NAME, "spEnableSpellpoints", {
-    name: "Enable Spell Points system",
-    hint: "Enables or disables spellpoints for casting spells, this will override the slot cost for player tokens.",
-    scope: "world",
-    config: true,
-    default: false,
-    type: Boolean,
-    onChange: spEnableSpellpoints => {
-      window.location.reload();
-    }
-  });
-  
   game.settings.registerMenu(MODULE_NAME, MODULE_NAME, {
-    name: "dnd5e-spellpoints.form",
-    label: "dnd5e-spellpoints.form-title",
-    hint: "dnd5e-spellpoints.form-hint",
+    name: "ningov-spellpoints.form",
+    label: "ningov-spellpoints.form-title",
+    hint: "ningov-spellpoints.form-hint",
     icon: "fas fa-magic",
     type: SpellPointsForm,
     restricted: true
