@@ -37,7 +37,8 @@ class SpellPoints {
   }
   
   static isModuleActive(){
-    return game.settings.get(MODULE_NAME, 'spEnableSpellpoints');
+    return true
+    //return game.settings.get(MODULE_NAME, 'spEnableSpellpoints');
   }
   
   static isActorCharacter(actor){
